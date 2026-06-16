@@ -49,6 +49,9 @@ let readerCurrent = 0;
 let readerMode    = 'single';
 let currentItem   = null;
 
+
+document.addEventListener('DOMContentLoaded', function() {
+
 /* ── DOM ────────────────────────────────────────── */
 const ageGate        = document.getElementById('age-gate');
 const ageYes         = document.getElementById('age-yes');
@@ -708,3 +711,5 @@ document.getElementById('genre-load-more-btn').addEventListener('click', () => {
 
 initAgeGate();
 fetchHome();
+
+}); // end DOMContentLoaded

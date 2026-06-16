@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>OtakuDex/title>
+  <title>OtakuDesu</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -88,7 +88,7 @@
     <div class="header__inner container">
       <a href="#" class="header__logo">
         <span class="logo-icon">🎌</span>
-        <span class="logo-text">OtakuDex</span>
+        <span class="logo-text">Otakudesu</span>
       </a>
       <div class="header__search">
         <span class="search-icon">🔍</span>
@@ -169,6 +169,11 @@
 
   </main>
 
-  <script src="script.js"></script>
+  <script src="script.js" defer></script>
+  <script>
+    window.addEventListener('error', function(e) {
+      document.body.innerHTML = '<div style="color:#f87171;font-family:monospace;padding:2rem;background:#0f172a;min-height:100vh"><h2>⚠️ Script Error</h2><p>' + e.message + '</p><p>' + e.filename + ':' + e.lineno + '</p></div>';
+    });
+  </script>
 </body>
 </html>
