@@ -3,7 +3,7 @@
 const API_HOME     = 'https://api.theresav.biz.id/anime/nhentai/home?apikey=mykey111';
 const API_POPULAR  = (page) => `https://api.theresav.biz.id/anime/nhentai/popular?page=${page}&apikey=mykey111`;
 const API_LATEST   = (page) => `https://api.theresav.biz.id/anime/nhentai/latest?page=${page}&apikey=mykey111`;
-const API_DOWNLOAD = 'https://api.theresav.biz.id/anime/nhentai/download?url={URL}&apikey=mykey111';
+const API_DOWNLOAD = (url)  => `https://api.theresav.biz.id/anime/nhentai/download?url=${encodeURIComponent(url)}&apikey=mykey111`;
 const API_GENRE    = (genre, page) => `https://api.theresav.biz.id/anime/nhentai/genres?genre=${encodeURIComponent(genre)}&page=${page}&apikey=mykey111`;
 const AGE_KEY      = 'nhb_age_verified';
 
@@ -12,6 +12,28 @@ const GENRE_LIST = [
   'Nakadashi','Blowjob','Defloration','Loli','Anal','Glasses','Incest',
   'Ahegao','Paizuri','Impregnation','X-ray','Milf','Femdom','Group','Yaoi','Yuri'
 ];
+
+/* ── Helpers ─────────────────────────────────────── */
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function isValid(item) {
+  return item &&
+    item.id    != null && String(item.id).trim()    !== '' &&
+    item.url   != null && String(item.url).trim()   !== '' &&
+    item.title != null && String(item.title).trim() !== '';
+}
+
+// ── Single global addUnique (no duplicate declaration) ──
+function addUnique(seenSet, items) {
+  return items.filter(i => {
+    const key = String(i.id);
+    if (seenSet.has(key)) return false;
+    seenSet.add(key);
+    return true;
+  });
+}
 
 /* ── Data Store ─────────────────────────────────── */
 let allData = {
@@ -175,7 +197,7 @@ function renderGrid(container, items) {
 }
 
 /* ══════════════════════════════════════════════════
-   LOAD MORE BUTTON (Latest)
+   LOAD MORE BUTTONS
 ══════════════════════════════════════════════════ */
 function ensureLoadMoreBtn() {
   const btn = document.getElementById('load-more-btn');
@@ -240,22 +262,6 @@ function setPopularLoadMore(state) {
 /* ══════════════════════════════════════════════════
    FILTER / SEARCH
 ══════════════════════════════════════════════════ */
-function isValid(item) {
-  return item &&
-    item.id    != null && String(item.id).trim()    !== '' &&
-    item.url   != null && String(item.url).trim()   !== '' &&
-    item.title != null && String(item.title).trim() !== '';
-}
-
-function addUnique(seenSet, items) {
-  return items.filter(i => {
-    const key = String(i.id);
-    if (seenSet.has(key)) return false;
-    seenSet.add(key);
-    return true;
-  });
-}
-
 function applySearch(query) {
   const q = query.trim().toLowerCase();
   if (activeTab === 'home') {
@@ -358,16 +364,25 @@ function openReader(item) {
   fetchPages(item);
 }
 
+/* ── FIX: Build download URL correctly from item.url ── */
 async function fetchPages(item) {
-  const encodedUrl = encodeURIComponent(item.url);
-  const apiUrl = API_DOWNLOAD.replace('{URL}', encodedUrl);
+  // item.url is like "https://nhentai.to/g/653160/" — pass it directly
+  const apiUrl = API_DOWNLOAD(item.url);
   try {
     const res  = await fetch(apiUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} — Tidak bisa memuat halaman manga`);
     const json = await res.json();
-    if (!json.status || !Array.isArray(json.result)) throw new Error('Invalid response');
-    readerPages = json.result;
-    if (!readerPages.length) throw new Error('No pages found');
+
+    // API returns: { status: true, total: N, result: ["url1", "url2", ...] }
+    // result is a direct array of image URL strings
+    let pages = [];
+    if (Array.isArray(json.result)) {
+      pages = json.result.filter(u => typeof u === 'string' && u.trim() !== '');
+    }
+
+    if (!pages.length) throw new Error('Tidak ada halaman ditemukan');
+
+    readerPages = pages;
     buildPageElements();
     readerLoading.classList.add('hidden');
     readerPages_el.classList.remove('hidden');
@@ -491,33 +506,36 @@ async function fetchHome() {
     renderGrid(latestGrid, allData.latest);
     ensureLoadMoreBtn();
     setLoadMoreState('ready');
-    fetchMoreLatest(true);
+    // FIX: DO NOT auto-call fetchMoreLatest here — let user click Load More
   } catch (err) {
     popularGrid.innerHTML = '';
     latestGrid.innerHTML  = '';
-    errorMsg.textContent  = `Failed to load: ${err.message}`;
+    errorMsg.textContent  = `Gagal memuat: ${err.message}`;
     errorBanner.classList.remove('hidden');
   }
 }
 
 /* ══════════════════════════════════════════════════
    FETCH MORE LATEST — paginated
+   FIX: increment page AFTER successful fetch, not before
 ══════════════════════════════════════════════════ */
-async function fetchMoreLatest(silent = false) {
+async function fetchMoreLatest() {
   if (latestLoading || !latestHasMore) return;
   latestLoading = true;
-  if (!silent) setLoadMoreState('loading');
+  setLoadMoreState('loading');
 
-  latestPage++;
+  const nextPage = latestPage + 1;
   try {
-    const res  = await fetch(API_LATEST(latestPage));
+    const res  = await fetch(API_LATEST(nextPage));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
+    // API /latest returns: { status: true, total: N, result: [{title,thumb,url,id}, ...] }
     let raw = [];
-    if (Array.isArray(json.result))                       raw = json.result;
+    if (Array.isArray(json.result))                            raw = json.result;
     else if (json.result && Array.isArray(json.result.latest)) raw = json.result.latest;
-    else if (Array.isArray(json))                          raw = json;
+    else if (json.result && Array.isArray(json.result.data))   raw = json.result.data;
+    else if (Array.isArray(json))                              raw = json;
 
     const newItems = addUnique(seenLatest, raw.filter(isValid));
 
@@ -525,16 +543,20 @@ async function fetchMoreLatest(silent = false) {
       latestHasMore = false;
       setLoadMoreState('done');
     } else if (newItems.length === 0) {
-      // All dupes this page — move on but don't infinite loop
-      setLoadMoreState(latestHasMore ? 'ready' : 'done');
+      // Semua duplikat halaman ini — coba halaman berikutnya otomatis
+      latestPage = nextPage;
+      latestLoading = false;
+      fetchMoreLatest();
+      return;
     } else {
+      latestPage = nextPage; // commit page increment only on success
       allData.latest = [...allData.latest, ...newItems];
       appendToGrid(latestGrid, newItems);
       setLoadMoreState('ready');
     }
   } catch (err) {
-    latestHasMore = false;
-    setLoadMoreState('done');
+    // Jangan tandai hasMore=false karena error jaringan sementara
+    setLoadMoreState('ready');
     console.warn('Could not load more latest:', err.message);
   } finally {
     latestLoading = false;
@@ -543,7 +565,10 @@ async function fetchMoreLatest(silent = false) {
 
 /* ══════════════════════════════════════════════════
    FETCH POPULAR ALL — paginated
+   Auto-load beberapa halaman sekaligus sampai 100+ manga
 ══════════════════════════════════════════════════ */
+const POPULAR_AUTO_PAGES = 5; // auto-fetch 5 halaman sekaligus per klik (biasanya 25/halaman = 125 manga)
+
 async function fetchPopularAll(reset = false) {
   if (popularLoading) return;
 
@@ -560,42 +585,50 @@ async function fetchPopularAll(reset = false) {
   }
 
   popularLoading = true;
-  try {
-    const res  = await fetch(API_POPULAR(popularPage));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if (!json.status || !json.result) throw new Error('Invalid API response');
 
-    let raw = [];
-    if (Array.isArray(json.result)) raw = json.result;
-    else if (json.result && Array.isArray(json.result.popular)) raw = json.result.popular;
+  // Fetch beberapa halaman sekaligus
+  const pagesToLoad = reset ? POPULAR_AUTO_PAGES : 1;
+  let loadedCount = 0;
 
-    const unique = addUnique(seenPopular, raw.filter(isValid));
+  for (let p = 0; p < pagesToLoad; p++) {
+    if (!popularHasMore) break;
+    try {
+      const res  = await fetch(API_POPULAR(popularPage));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (!json.status || !json.result) throw new Error('Invalid API response');
 
-    if (raw.length === 0) {
-      popularHasMore = false;
-      if (reset) renderGrid(popularAllGrid, []);
-      setPopularLoadMore('done');
-    } else if (unique.length === 0) {
-      // All dupes — stop
-      popularHasMore = false;
-      setPopularLoadMore('done');
-    } else {
-      allData.popularAll = [...allData.popularAll, ...unique];
-      if (reset) renderGrid(popularAllGrid, allData.popularAll);
-      else appendToGrid(popularAllGrid, unique);
-      if (popularAllCount) popularAllCount.textContent = `${allData.popularAll.length} titles`;
-      popularPage++;
-      setPopularLoadMore('ready');
+      // API /popular returns: { status: true, total: N, result: [{title,thumb,url,id}, ...] }
+      let raw = [];
+      if (Array.isArray(json.result)) raw = json.result;
+      else if (json.result && Array.isArray(json.result.popular)) raw = json.result.popular;
+      else if (json.result && Array.isArray(json.result.data))    raw = json.result.data;
+
+      const unique = addUnique(seenPopular, raw.filter(isValid));
+
+      if (raw.length === 0) {
+        popularHasMore = false;
+        break;
+      } else if (unique.length > 0) {
+        allData.popularAll = [...allData.popularAll, ...unique];
+        loadedCount += unique.length;
+        popularPage++;
+      } else {
+        // All dupes — lewati halaman ini
+        popularPage++;
+      }
+    } catch (err) {
+      console.warn('Popular fetch error:', err.message);
+      break;
     }
-  } catch (err) {
-    popularHasMore = false;
-    setPopularLoadMore('done');
-    if (reset) popularAllGrid.innerHTML = `<p style="color:var(--danger);padding:1rem">⚠️ ${err.message}</p>`;
-    console.warn('Popular fetch error:', err.message);
-  } finally {
-    popularLoading = false;
   }
+
+  if (reset) renderGrid(popularAllGrid, allData.popularAll);
+  else appendToGrid(popularAllGrid, allData.popularAll.slice(-loadedCount));
+
+  if (popularAllCount) popularAllCount.textContent = `${allData.popularAll.length} titles`;
+  setPopularLoadMore(popularHasMore ? 'ready' : 'done');
+  popularLoading = false;
 }
 
 retryBtn.addEventListener('click', () => {
@@ -605,7 +638,7 @@ retryBtn.addEventListener('click', () => {
 });
 
 /* ══════════════════════════════════════════════════
-   FETCH GENRE — paginated, no infinite loop
+   FETCH GENRE — paginated, auto-load beberapa halaman
 ══════════════════════════════════════════════════ */
 async function fetchGenre(reset = false) {
   if (genreLoading) return;
@@ -629,26 +662,28 @@ async function fetchGenre(reset = false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
+    // API /genres returns: { status: true, total: N, genre: "...", result: [{title,thumb,url,id}, ...] }
     let raw = [];
-    if (Array.isArray(json.result))                          raw = json.result;
-    else if (json.result && Array.isArray(json.result.result)) raw = json.result.result;
+    if (Array.isArray(json.result))                              raw = json.result;
+    else if (json.result && Array.isArray(json.result.result))   raw = json.result.result;
+    else if (json.result && Array.isArray(json.result.data))     raw = json.result.data;
 
     const unique = addUnique(seenGenre, raw.filter(isValid));
 
     if (raw.length === 0) {
-      // API returned empty — truly no more pages
       genreHasMore = false;
       if (reset) renderGrid(genreGrid, []);
       setGenreLoadMore('done');
     } else if (unique.length === 0) {
-      // All dupes — increment page and allow user to try again (cap retries)
       genreRetries++;
       genrePage++;
       if (genreRetries >= MAX_GENRE_RETRIES) {
         genreHasMore = false;
         setGenreLoadMore('done');
       } else {
-        setGenreLoadMore('ready');
+        genreLoading = false;
+        fetchGenre(false); // coba halaman berikutnya otomatis
+        return;
       }
     } else {
       genreRetries = 0;
@@ -667,22 +702,6 @@ async function fetchGenre(reset = false) {
   } finally {
     genreLoading = false;
   }
-}
-
-/* ══════════════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════════════ */
-function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function addUnique(seenSet, items) {
-  return items.filter(i => {
-    const key = String(i.id);
-    if (seenSet.has(key)) return false;
-    seenSet.add(key);
-    return true;
-  });
 }
 
 /* ══════════════════════════════════════════════════
