@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OtakuDex/title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Age Verification Modal -->
+  <div id="age-gate" class="age-gate">
+    <div class="age-gate__box">
+      <div class="age-gate__icon">🔞</div>
+      <h1 class="age-gate__title">Adult Content</h1>
+      <p class="age-gate__subtitle">This site contains explicit adult content intended for viewers 18 years of age or older.</p>
+      <p class="age-gate__question">Are you 18 or older?</p>
+      <div class="age-gate__actions">
+        <button id="age-yes" class="btn btn--primary">Yes, I'm 18+</button>
+        <button id="age-no" class="btn btn--ghost">No, Exit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info Modal -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal__backdrop"></div>
+    <div class="modal__box">
+      <button id="modal-close" class="modal__close" aria-label="Close">✕</button>
+      <img id="modal-thumb" class="modal__thumb" src="" alt="" />
+      <div class="modal__info">
+        <span class="modal__badge">ID: <span id="modal-id">—</span></span>
+        <h2 id="modal-title" class="modal__title">—</h2>
+        <div class="modal__actions">
+          <a id="modal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn--ghost modal__btn">
+            🔗 URL
+          </a>
+          <button id="modal-read" class="btn btn--primary modal__btn">
+            📖 Read Now
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reader Overlay -->
+  <div id="reader" class="reader hidden" aria-hidden="true">
+    <div class="reader__topbar">
+      <button id="reader-back" class="reader__back">← Back</button>
+      <div class="reader__meta">
+        <span id="reader-title" class="reader__title-text"></span>
+        <span id="reader-progress" class="reader__progress"></span>
+      </div>
+      <div class="reader__nav">
+        <button id="reader-prev" class="btn btn--ghost btn--sm">‹ Prev</button>
+        <button id="reader-next" class="btn btn--primary btn--sm">Next ›</button>
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="reader-loading" class="reader__loading">
+      <div class="reader__spinner"></div>
+      <p>Loading pages…</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="reader-error" class="reader__error hidden">
+      <p>⚠️ <span id="reader-error-msg"></span></p>
+      <button id="reader-retry" class="btn btn--primary btn--sm">Retry</button>
+    </div>
+
+    <!-- Pages container -->
+    <div id="reader-pages" class="reader__pages hidden">
+      <!-- pages injected by JS -->
+    </div>
+
+    <div class="reader__bottombar">
+      <button id="reader-prev2" class="btn btn--ghost">‹ Prev</button>
+      <span id="reader-progress2" class="reader__progress"></span>
+      <button id="reader-next2" class="btn btn--primary">Next ›</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header__inner container">
+      <a href="#" class="header__logo">
+        <span class="logo-icon">🎌</span>
+        <span class="logo-text">OtakuDex</span>
+      </a>
+      <div class="header__search">
+        <span class="search-icon">🔍</span>
+        <input id="search-input" type="text" placeholder="Search titles…" class="search-input" />
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="main container">
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="error-banner hidden">
+      <span>⚠️</span>
+      <p id="error-msg">Failed to load data. Please try again.</p>
+      <button id="retry-btn" class="btn btn--ghost btn--sm">Retry</button>
+    </div>
+
+    <!-- Tab Nav -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="home">🏠 Home</button>
+      <button class="tab-btn" data-tab="popular">🔥 Popular</button>
+      <button class="tab-btn" data-tab="genre">🏷️ Genre</button>
+    </div>
+
+    <!-- HOME TAB -->
+    <div id="tab-home" class="tab-panel">
+      <section class="section" id="popular-section">
+        <div class="section__header">
+          <h2 class="section__title"><span class="section__pill">🔥</span> Popular</h2>
+        </div>
+        <div id="popular-grid" class="card-grid"></div>
+      </section>
+      <section class="section" id="latest-section">
+        <div class="section__header">
+          <h2 class="section__title"><span class="section__pill">🆕</span> Latest</h2>
+        </div>
+        <div id="latest-grid" class="card-grid"></div>
+        <div class="load-more-wrap hidden">
+          <button id="load-more-btn" class="btn btn--ghost load-more-btn">Load More Latest</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- POPULAR ALL TAB -->
+    <div id="tab-popular" class="tab-panel hidden">
+      <section class="section" id="popular-all-section">
+        <div class="section__header">
+          <h2 class="section__title"><span class="section__pill">🔥</span> Popular <span id="popular-all-count" class="section__count"></span></h2>
+        </div>
+        <div id="popular-all-grid" class="card-grid"></div>
+        <div class="load-more-wrap hidden">
+          <button id="popular-load-more-btn" class="btn btn--ghost load-more-btn">Load More</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- GENRE TAB -->
+    <div id="tab-genre" class="tab-panel hidden">
+      <section class="section" id="genre-section">
+        <div class="section__header genre-header">
+          <h2 class="section__title"><span class="section__pill">🏷️</span> Genre <span id="genre-count" class="section__count"></span></h2>
+          <div class="genre-select-wrap">
+            <select id="genre-select" class="genre-select"></select>
+          </div>
+        </div>
+        <div id="genre-grid" class="card-grid"></div>
+        <div class="load-more-wrap hidden">
+          <button id="genre-load-more-btn" class="btn btn--ghost load-more-btn">Load More</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- No Results -->
+    <div id="no-results" class="no-results hidden">
+      <p>😶 No titles match "<span id="search-term"></span>"</p>
+    </div>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
